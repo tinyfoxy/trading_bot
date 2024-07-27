@@ -1,5 +1,3 @@
-Arbitrage Trading Bot User Guide
-
 ## Introduction
 This arbitrage trading bot is designed to capitalize on price differences between decentralized exchanges (DEX) and centralized exchanges (CEX), specifically OKX. It monitors both buy and sell opportunities for the ETH/USDT trading pair.
 
@@ -39,7 +37,7 @@ If you encounter any challenges:
 - Ensure you have sufficient balance on both OKX and your Ethereum wallet
 - Check your internet connection
 
-## Areas for Further Development
+## Further Development
 
 The current version of the bot has several areas that require further implementation or refinement:
 
