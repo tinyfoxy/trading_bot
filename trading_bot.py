@@ -3,14 +3,14 @@ import time
 import threading
 from web3 import Web3
 
-# 配置参数
+# Configuration parameters
 SYMBOL = 'ETH/USDT'
-AMOUNT = 1  # 交易数量（ETH）
-PROFIT_RATE = 0.01  # 期望利润率
-TOKEN_A = '0x...'  # ETH合约地址
-TOKEN_B = '0x...'  # USDT合约地址
+AMOUNT = 1  # Trading amount (ETH)
+PROFIT_RATE = 0.01  # Expected profit rate
+TOKEN_A = '0x...'  # ETH contract address
+TOKEN_B = '0x...'  # USDT contract address
 
-# 初始化交易所和Web3连接
+# Initialize exchange and Web3 connection
 okx = ccxt.okx({
     'apiKey': 'YOUR_API_KEY',
     'secret': 'YOUR_SECRET',
@@ -21,17 +21,19 @@ w3 = Web3(Web3.HTTPProvider('https://mainnet.infura.io/v3/YOUR_INFURA_PROJECT_ID
 dex_contract = w3.eth.contract(address='DEX_CONTRACT_ADDRESS', abi=DEX_ABI)
 
 def get_dex_price(token_in, token_out, amount):
+    """Get the price from DEX for a given token pair and amount."""
     amount_in = Web3.toWei(amount, 'ether')
     amounts_out = dex_contract.functions.getAmountsOut(amount_in, [token_in, token_out]).call()
     return Web3.fromWei(amounts_out[1], 'ether')
 
 def execute_dex_trade(from_token, to_token, amount):
-    deadline = int(time.time()) + 600
+    """Execute a trade on DEX."""
+    deadline = int(time.time()) + 600  # 10 minutes from now
     path = [from_token, to_token]
     amount_in = Web3.toWei(amount, 'ether')
     
     amounts_out = dex_contract.functions.getAmountsOut(amount_in, path).call()
-    min_amount_out = int(amounts_out[-1] * 0.99)
+    min_amount_out = int(amounts_out[-1] * 0.99)  # 1% slippage tolerance
     
     transaction = dex_contract.functions.swapExactTokensForTokens(
         amount_in,
@@ -52,21 +54,26 @@ def execute_dex_trade(from_token, to_token, amount):
     return tx_receipt
 
 def create_cex_order(side, amount, price):
+    """Create an order on the centralized exchange."""
     return okx.create_order(SYMBOL, 'limit', side, amount, price)
 
 def get_cex_current_price(symbol):
+    """Get the current market price from the centralized exchange."""
     ticker = okx.fetch_ticker(symbol)
     return ticker['last']
 
 def calculate_final_buy_price(theoretical_buy_price, symbol):
+    """Calculate the final buy price considering the current market price."""
     current_market_price = get_cex_current_price(symbol)
     return min(theoretical_buy_price, current_market_price)
 
 def calculate_final_sell_price(theoretical_sell_price, symbol):
+    """Calculate the final sell price considering the current market price."""
     current_market_price = get_cex_current_price(symbol)
     return max(theoretical_sell_price, current_market_price)
 
 def monitor_order_and_price_difference(order_id, symbol, is_buy_order):
+    """Monitor an order and cancel it if the price difference becomes unfavorable."""
     while True:
         try:
             order = okx.fetch_order(order_id, symbol)
@@ -91,6 +98,7 @@ def monitor_order_and_price_difference(order_id, symbol, is_buy_order):
             time.sleep(60)
 
 def handle_partial_fill(order, filled_amount):
+    """Handle partial fill of an order by executing a corresponding trade on DEX."""
     try:
         if order['side'] == 'buy':
             dex_trade_result = execute_dex_trade(TOKEN_A, TOKEN_B, filled_amount)
@@ -101,6 +109,7 @@ def handle_partial_fill(order, filled_amount):
         print(f"Error executing DEX trade for partial fill: {e}")
 
 def monitor_cex_buy_eth():
+    """Monitor and execute buy orders on CEX and corresponding sell orders on DEX."""
     while True:
         try:
             dex_usdt_to_eth_price = get_dex_price(TOKEN_B, TOKEN_A, AMOUNT)
@@ -135,6 +144,7 @@ def monitor_cex_buy_eth():
             time.sleep(60)
 
 def monitor_cex_sell_eth():
+    """Monitor and execute sell orders on CEX and corresponding buy orders on DEX."""
     while True:
         try:
             dex_eth_to_usdt_price = get_dex_price(TOKEN_A, TOKEN_B, AMOUNT)
@@ -168,10 +178,10 @@ def monitor_cex_sell_eth():
             print(f"Error in sell monitoring: {e}")
             time.sleep(60)
 
-# 启动监控线程
+# Start monitoring threads
 threading.Thread(target=monitor_cex_buy_eth).start()
 threading.Thread(target=monitor_cex_sell_eth).start()
 
-# 主循环，保持程序运行
+# Main loop to keep the program running
 while True:
     time.sleep(1)
